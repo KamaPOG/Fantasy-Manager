@@ -168,6 +168,7 @@ def league_context(user_id, league_id, week):
         "superflex": "SUPER_FLEX" in league["roster_positions"],
         "rostered": {p for r in rosters for p in (r.get("players") or [])},
         "opponent": None,
+        "starters": mine.get("starters") or [],
     }
     matchups = get(f"/league/{league_id}/matchups/{week}")
     me = next((m for m in matchups if m["roster_id"] == mine["roster_id"]), None)
@@ -182,6 +183,64 @@ def league_context(user_id, league_id, week):
                 "my_pts": me.get("points") or 0,
             }
     return ctx
+
+
+def lineup_changes(P, la, ctx):
+    """Diff the recommended lineup against the starters currently set in Sleeper."""
+    R = ctx["rostered"]
+    rows = [(P.resolve(r.get("player"), R), r) for r in la.get("lineup") or []]
+    rec = [pid for pid, _ in rows if pid]
+    current = list(ctx["starters"])
+    outs = [c for c in current if c not in rec]
+    ins = [(pid, r) for pid, r in rows if pid and pid not in current]
+    pos = lambda pid: P.db.get(pid, {}).get("position")
+    swaps = []
+    for pid, row in ins:
+        match = next((o for o in outs if o != "0" and pos(o) == pos(pid)), None) or (outs[0] if outs else None)
+        if match is not None:
+            outs.remove(match)
+        swaps.append({"out": None if match in (None, "0") else match, "in": pid, "slot": row.get("slot"),
+                      "note": row.get("note")})
+    for o in outs:
+        if o != "0":
+            swaps.append({"out": o, "in": None, "slot": None, "note": None})
+    conditional = [(pid, r) for pid, r in rows if pid and r.get("alt") and r.get("verdict") == "check"]
+    return swaps, conditional
+
+
+def render_changes(P, leagues, short):
+    out = ['<section class="section" id="aendern"><h3>Bei Sleeper ändern</h3><div class="changes">']
+    for lid, la, ctx in leagues:
+        R = ctx["rostered"]
+        swaps, conditional = lineup_changes(P, la, ctx)
+        state = "todo" if swaps else "done"
+        out.append(f'<div class="panel chg {state}"><div class="chg-head"><b>{esc(short[lid])}</b>'
+                   f'<a class="btn" href="https://sleeper.com/leagues/{lid}/team" target="_blank" rel="noopener">'
+                   "In Sleeper öffnen ↗</a></div>")
+        if swaps:
+            n = len(swaps)
+            out.append(f'<p class="chg-sum">{n} {"Wechsel" if n == 1 else "Wechsel"} nötig</p>')
+            for sw in swaps:
+                left = P.card(sw["out"], R) if sw["out"] else '<span class="empty">leerer Slot</span>'
+                right = P.card(sw["in"], R) if sw["in"] else '<span class="empty">auf die Bank, Slot neu besetzen</span>'
+                slot = f'<span class="slot">{esc(sw["slot"])}</span>' if sw["slot"] else ""
+                out.append('<div class="io">'
+                           f'<div class="side out"><span class="lbl give">Raus</span>{left}</div>'
+                           '<span class="arrow">→</span>'
+                           f'<div class="side in"><span class="lbl get">Rein {slot}</span>{right}</div>'
+                           + (f'<p class="io-note">{esc(sw["note"])}</p>' if sw["note"] else "") + "</div>")
+        else:
+            out.append('<p class="chg-sum ok">✓ Keine Änderung nötig. Deine Aufstellung in Sleeper passt.</p>')
+        if conditional:
+            out.append('<div class="cond"><span class="tag">Nur falls Out</span>')
+            for pid, row in conditional:
+                out.append('<div class="io sm">'
+                           f'<div class="side out">{P.card(pid, R, "sm")}</div><span class="arrow">→</span>'
+                           f'<div class="side in">{P.card(row["alt"], R, "sm")}</div></div>')
+            out.append("</div>")
+        out.append("</div>")
+    out.append("</div></section>")
+    return "".join(out)
 
 
 CSS = """
@@ -267,6 +326,25 @@ small { color: var(--muted); }
 .inj { font-style: normal; font-weight: 700; font-size: .7rem; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
 .inj.bad { background: var(--bad-soft); color: var(--bad); } .inj.warn { background: var(--warn-soft); color: var(--warn); }
 .inj.ok { background: var(--good-soft); color: var(--good); }
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 14px; align-items: start; }
+.chg { border-top: 5px solid var(--bad); }
+.chg.done { border-top-color: var(--good); }
+.chg-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chg-head b { font-family: var(--f-display); font-size: 1.4rem; }
+.btn { display: inline-block; padding: 6px 12px; border-radius: 6px; background: var(--accent); color: var(--surface); font-weight: 700; text-decoration: none; font-size: .9rem; }
+.btn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.chg-sum { margin: 0; font-weight: 700; color: var(--bad); }
+.chg-sum.ok { color: var(--good); }
+.io { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px 10px; align-items: center;
+  padding: 10px; border-radius: 8px; background: var(--sunk); }
+.io .side { display: grid; gap: 6px; min-width: 0; }
+.io .side.out { opacity: .85; }
+.io .pl-t b { white-space: normal; overflow-wrap: anywhere; }
+.io .slot { font-size: .8rem; margin-left: 4px; color: var(--good); }
+.io-note { grid-column: 1 / -1; margin: 0; font-size: .88rem; color: var(--muted); }
+.io.sm { padding: 6px 10px; }
+.cond { display: grid; gap: 6px; }
+.empty { font-style: italic; color: var(--muted); }
 .items { display: grid; gap: 12px; }
 .item { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .item:first-child { border-top: 0; padding-top: 0; }
@@ -314,8 +392,11 @@ def render(analysis):
     if analysis.get("context"):
         out.append(f"<small>{esc(analysis['context'])}</small>")
     out.append('<nav class="jump" aria-label="Ligen">' + "".join(
-        f'<a href="#{esc(la.get("anchor") or "l" + lid)}">{esc(short[lid])}</a>' for lid, la, _ in leagues) + "</nav>")
+        f'<a href="#{esc(la.get("anchor") or "l" + lid)}">{esc(short[lid])}</a>' for lid, la, _ in leagues)
+        + '<a href="#aendern">Raus / Rein</a></nav>')
     out.append("</header>")
+
+    out.append(render_changes(P, leagues, short))
 
     acts = analysis.get("actions") or []
     order = {"now": 0, "today": 1, "week": 2}
