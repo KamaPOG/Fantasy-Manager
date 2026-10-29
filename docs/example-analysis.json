@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-29",
+  "date_label": "Donnerstag, 29. Oktober",
+  "week": 8,
+  "headline": "Fairbairn in beiden Ligen droppen, Rico Dowdle (Ordner) und Dylan Sampson (RFL) holen, und für Freitag Odunze und Sutton als Ersatz bereithalten.",
+  "context": "Bye: SF, HOU, NO, NYG. Thursday Night: Panthers @ Packers – kein Starter von dir betroffen.",
+  "actions": [
+    {"type": "waiver", "urgency": "now", "league": "1388467524567339008", "text": "Rico Dowdle holen, Ka'imi Fairbairn droppen. Du hast hinter Taylor und Walker nur RJ Harvey.", "players": ["Rico Dowdle", "Ka'imi Fairbairn"]},
+    {"type": "waiver", "urgency": "now", "league": "1342801028390588416", "text": "Dylan Sampson (Rookie-RB) holen, Ka'imi Fairbairn droppen.", "players": ["Dylan Sampson", "Ka'imi Fairbairn"]},
+    {"type": "lineup", "urgency": "today", "league": "1388467524567339008", "text": "DeVonta Smith raus, Rome Odunze rein. Smith hat Mittwoch nicht trainiert.", "players": ["Rome Odunze", "DeVonta Smith"]},
+    {"type": "injury", "urgency": "today", "league": "1342801028390588416", "text": "Lamar Jackson in den Superflex. Er hat voll trainiert und soll gegen Buffalo spielen.", "players": ["Lamar Jackson"]},
+    {"type": "injury", "urgency": "week", "league": "1342801028390588416", "text": "Stefon Diggs (Hand) bis Freitag beobachten. Fällt er aus, kommt Courtland Sutton.", "players": ["Stefon Diggs", "Courtland Sutton"]},
+    {"type": "trade", "urgency": "week", "league": "1342801028390588416", "text": "Daniel Jones den KingsfieldRhinos für Seth McGowan anbieten. Sie haben keinen sicheren QB.", "players": ["Daniel Jones", "Seth McGowan"]},
+    {"type": "trade", "urgency": "week", "league": "1388467524567339008", "text": "Nico Collins bei Lxca04 günstig anfragen (Bye-Woche, schwache Phase).", "players": ["Nico Collins"]}
+  ],
+  "leagues": {
+    "1388467524567339008": {
+      "short": "Ordner NFL",
+      "anchor": "ordner",
+      "summary": "Du hast mehr Punkte erzielt als dein Gegner (779 zu 665). Dein Problem diese Woche sind die zwei fraglichen WRs. Die Bank ist stark genug, um beide zu ersetzen.",
+      "matchup": "Burrow, Henry und Puka Nacua tragen sein Team. Rice und Malik Washington sind fraglich, dahinter ist seine WR-Bank dünn.",
+      "lineup": [
+        {"slot": "QB", "player": "Dak Prescott", "note": "Gegen Arizona, gutes Matchup."},
+        {"slot": "RB", "player": "Jonathan Taylor"},
+        {"slot": "RB", "player": "Kenneth Walker III"},
+        {"slot": "WR", "player": "Josh Downs", "note": "Alec Pierce ist auf IR, Downs ist jetzt der Nr.-1-Receiver der Colts."},
+        {"slot": "WR", "player": "Rome Odunze", "verdict": "swap", "replaces": "DeVonta Smith", "note": "Smith hat Mittwoch nicht trainiert und letzte Woche gefehlt."},
+        {"slot": "FLEX", "player": "Emeka Egbuka", "verdict": "check", "alt": "Xavier Worthy", "note": "Gehirnerschütterung, eingeschränkt im Training. Status kommt Freitag."},
+        {"slot": "TE", "player": "T.J. Hockenson", "note": "Tyler Warren (Leiste) bleibt auf der Bank."},
+        {"slot": "K", "player": "Chad Ryland"},
+        {"slot": "DEF", "player": "PIT"}
+      ],
+      "injuries": [
+        {"player": "DeVonta Smith", "impact": "mine", "text": "Hamstring. Er hat Mittwoch nicht trainiert und schon das letzte Spiel verpasst. Bank ihn, droppen musst du ihn nicht."},
+        {"player": "Emeka Egbuka", "impact": "mine", "text": "Gehirnerschütterung, eingeschränkt im Training. Ob er spielen darf, entscheidet das Protokoll. Worthy steht bereit."},
+        {"player": "Tyler Warren", "impact": "mine", "text": "Leiste, fraglich. Er sitzt bei dir ohnehin hinter Hockenson."},
+        {"player": "Rashee Rice", "impact": "opponent", "text": "Hamstring, fraglich. Fällt er aus, fehlt deinem Gegner ein WR-Starter."}
+      ],
+      "opportunities": [
+        {"player": "Rico Dowdle", "action": "Holen", "text": "Er teilt sich die Arbeit mit Jaylen Warren und wird stark hinzugefügt. Für dich ist er die fehlende RB-Tiefe."},
+        {"player": "Devin Singletary", "action": "Stashen", "text": "Tracy ist auf IR, Skattebo hat Hamstring-Probleme. Ab Woche 9 könnte er der Haupt-RB der Giants sein. Skattebo gehört deinem Gegner kohenk96, du nimmst ihm also den Ersatz weg."},
+        {"player": "Saquon Barkley", "action": "Beobachten", "text": "Rücken und Hamstring, nicht im Training. Jaydon Blue und Elijah Mitchell hat sich schon timgrs geholt, für dich ist da nichts zu holen."}
+      ],
+      "free_agents": [
+        {"add": "Rico Dowdle", "drop": "Ka'imi Fairbairn", "text": "Fairbairn hat diese Woche Bye, und Ryland ist dein Kicker."},
+        {"add": "Devin Singletary", "drop": "KC Concepcion Jr.", "text": "Concepcion bringt dir in dieser Saison kaum Punkte, Singletary bekommt gerade eine größere Rolle."},
+        {"add": "Ryan Flournoy", "text": "Zwei von drei Spielen mit 70+ Yards. Nur holen, wenn dir ein WR ausfällt."}
+      ],
+      "trades": [
+        {"partner": "Lxca04", "kind": "buy-low", "give": ["Xavier Worthy", "RJ Harvey"], "get": ["Nico Collins"], "text": "Lxca04 hat sechs WRs. Collins ist nach Bye und schwacher Phase günstig. Worthy wird gerade schwächer eingeschätzt, mit Collins hast du einen WR1 für die Playoffs ab Woche 14."},
+        {"partner": "einem Team mit schwachem QB", "kind": "depth", "give": ["Justin Herbert"], "get": [], "text": "Im 1-QB-Format brauchst du Herbert nur in Daks Bye-Woche. Pack ihn in ein Paket für RB-Tiefe."}
+      ]
+    },
+    "1342801028390588416": {
+      "short": "RFL Dynasty",
+      "anchor": "rfl",
+      "summary": "Du hast die zweitmeisten Punkte der Liga, aber eine 2-5-Bilanz. Dein Team ist stark, du hattest bisher Pech. Mit Lamars Rückkehr steigt dein Wert, und auf QB hast du mehr Spieler, als du brauchst. Die nutzt du im Superflex als Tauschgut.",
+      "matchup": "Moneyball94 startet Jacoby Brissett und Geno Smith als QBs. Amon-Ra St. Brown ist fraglich. Du hast das klar bessere QB-Duo.",
+      "lineup": [
+        {"slot": "QB", "player": "Jared Goff"},
+        {"slot": "SF", "player": "Lamar Jackson", "verdict": "check", "alt": "Daniel Jones", "note": "Er hat voll trainiert. Laut Rapoport spielt er Sonntag gegen die Bills."},
+        {"slot": "RB", "player": "Javonte Williams", "note": "Bei SI auf Platz 9 der RBs diese Woche, gegen Arizona."},
+        {"slot": "RB", "player": "Kenneth Walker III"},
+        {"slot": "WR", "player": "Justin Jefferson"},
+        {"slot": "WR", "player": "Zay Flowers", "note": "Profitiert direkt von Lamars Rückkehr."},
+        {"slot": "FLEX", "player": "Chase Brown"},
+        {"slot": "FLEX", "player": "Stefon Diggs", "verdict": "check", "alt": "Courtland Sutton", "note": "Hand, fraglich. Plan C: Khalil Shakir."},
+        {"slot": "TE", "player": "Travis Kelce"},
+        {"slot": "K", "player": "Will Reichard"},
+        {"slot": "DEF", "player": "DEN"}
+      ],
+      "injuries": [
+        {"player": "Lamar Jackson", "impact": "mine", "text": "Knöchel. Er war voll im Training, nachdem er drei Spiele verpasst hat. Das wirkt sich auch auf Flowers aus."},
+        {"player": "Stefon Diggs", "impact": "mine", "text": "Hand. Die Meldungen widersprechen sich. Warte den Freitags-Report ab."},
+        {"player": "Jaxson Dart", "impact": "mine", "text": "IR (Meniskus). Er belegt einen deiner zwei IR-Slots."},
+        {"player": "Michael Pittman Jr.", "impact": "mine", "text": "IR (Fuß). Er belegt deinen zweiten IR-Slot."},
+        {"player": "Amon-Ra St. Brown", "impact": "opponent", "text": "Knöchel, fraglich. Er ist der beste WR deines Gegners."}
+      ],
+      "opportunities": [
+        {"player": "Daniel Jones", "action": "Verkaufen", "text": "Im Superflex sind QBs viel wert, und gerade sind viele verletzt. Du hast Goff, Lamar, Jones und McCarthy und Dart auf IR. Jones ist dein bestes Tauschgut."},
+        {"player": "Dylan Sampson", "action": "Holen", "text": "Rookie-RB der Browns mit Langzeitwert. Er hat aktuell Knieprobleme, wird aber stark hinzugefügt."},
+        {"player": "Jake Ferguson", "action": "Holen", "text": "Stamm-TE der Cowboys und frei. Er sichert dich ab, falls Kelce (37) nachlässt oder Warren länger ausfällt."}
+      ],
+      "free_agents": [
+        {"add": "Dylan Sampson", "drop": "Ka'imi Fairbairn", "text": "Fairbairn ist dein zweiter Kicker. Sampson hat im Dynasty echten Wert."},
+        {"add": "Jake Ferguson", "drop": "DET", "text": "Die Lions sind deine zweite Defense, du brauchst nur eine."},
+        {"add": "Devin Singletary", "text": "Gut für die nächsten Wochen, langfristig wenig wert. Nur holen, wenn dir ein RB ausfällt."}
+      ],
+      "trades": [
+        {"partner": "KingsfieldRhinos", "kind": "upgrade", "give": ["Daniel Jones"], "get": ["Seth McGowan"], "text": "Die Rhinos (2-4) haben Cousins und Murray als QBs, McKee als Ersatz, Hurts ist auf IR. Dafür haben sie acht RBs. McGowan ist jung und sein Wert steigt. Alternativ Jaylen Warren. Trade-Deadline ist Woche 11."},
+        {"partner": "Yannick0315", "kind": "sell-high", "give": ["Travis Kelce"], "get": ["Kyren Williams"], "text": "Yannick ist 6-1, will den Titel und hat nur Strange und Kraft auf TE. Kelce ist 37. Verkauf ihn, solange er noch Wert hat. Alternativ einen 1st-Round-Pick 2027 verlangen. Mach das nur, wenn du diese Saison eher auf Neuaufbau setzt."}
+      ]
+    }
+  },
+  "sources": [
+    {"title": "CBS Sports – Week 8 Injury Report", "url": "https://www.cbssports.com/nfl/news/nfl-week-8-injury-report-lamar-jackson-kerby-joseph-updates/"},
+    {"title": "Yahoo – Fantasy Injury Report Week 8", "url": "https://sports.yahoo.com/articles/fantasy-football-injury-report-latest-165343896.html"},
+    {"title": "NFL.com – Injury Report Week 8", "url": "https://www.nfl.com/injuries/?week=8"},
+    {"title": "Forbes – Week 8 Injury Roundup", "url": "https://www.forbes.com/sites/bryantoporek/2026/10/27/week-8-fantasy-football-injury-roundup-christian-mccaffrey-saquon-barkley-cam-skattebo-and-more/"},
+    {"title": "NBC Sports Philadelphia – Eagles Injury Report", "url": "https://www.nbcsportsphiladelphia.com/nfl/philadelphia-eagles/eagles-injury-report-saquon-barkley-devonta-smith-dontayvion-wicks-week-8-commanders-estimation/762494/"},
+    {"title": "FantasyPros – Waiver Week 8", "url": "https://www.fantasypros.com/2026/10/beyond-the-waiver-wire-fantasy-football-moves-to-make-week-8-2026/"},
+    {"title": "CBS Sports – Waiver Wire Week 8", "url": "https://www.cbssports.com/fantasy/football/news/fantasy-football-2026-week-8-waiver-wire/"},
+    {"title": "RotoBaller – Buy Low / Sell High Week 8", "url": "https://www.rotoballer.com/buy-sell-trade-advice-week-8-buy-low-sell-high-picks-2026/1976532"},
+    {"title": "FantasyPros – Dynasty Risers & Fallers Week 8", "url": "https://www.fantasypros.com/2026/10/10-dynasty-fantasy-football-risers-fallers-week-8-2026/"},
+    {"title": "FantraxHQ – Dynasty Market Week 8", "url": "https://fantraxhq.com/fantasy-football-dynasty-market-week-8-risers-and-fallers/"},
+    {"title": "SI – Start/Sit Running Backs Week 8", "url": "https://www.si.com/fantasy/week-8-start-em-sit-em-running-backs"}
+  ]
+}

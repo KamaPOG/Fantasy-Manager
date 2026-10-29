@@ -53,8 +53,11 @@ def main():
         by_rid = {r["roster_id"]: r for r in rosters}
         mine = next((r for r in rosters if r["owner_id"] == user["user_id"]), None)
         kind = {0: "Redraft", 1: "Keeper", 2: "Dynasty"}.get(league["settings"].get("type"), "?")
+        st = league["settings"]
         print(f"## {league['name']} ({kind}, {league['total_rosters']} Teams, "
-              f"PPR {league['scoring_settings'].get('rec')})")
+              f"PPR {league['scoring_settings'].get('rec')}) – league_id {lid}")
+        print(f"Trade-Deadline Woche {st.get('trade_deadline')}, Playoffs ab Woche {st.get('playoff_week_start')}, "
+              f"IR-Slots {st.get('reserve_slots')}")
         print("Slots: " + ", ".join(s for s in league["roster_positions"] if s != "BN"))
         if not mine:
             print("Kein eigener Kader gefunden.\n")
@@ -98,6 +101,27 @@ def main():
         for t in get("/players/nfl/trending/add?lookback_hours=24&limit=40"):
             if t["player_id"] not in rostered:
                 print(f"- {describe(t['player_id'], players)} – +{t['count']}")
+
+        free = [(pid, p) for pid, p in players.items()
+                if pid not in rostered and p.get("active") and p.get("team")
+                and p.get("position") in ("QB", "RB", "WR", "TE") and p.get("search_rank")]
+        free.sort(key=lambda x: x[1]["search_rank"])
+        print("\n### Beste freie Spieler (nach Sleeper-Rang)")
+        for pid, p in free[:25]:
+            print(f"- {describe(pid, players)} – Alter {p.get('age')}, Rang {p['search_rank']}")
+
+        print("\n### Andere Kader (für Trades)")
+        for r in ranked:
+            if r is mine:
+                continue
+            groups = {}
+            for pid in r.get("players") or []:
+                pos = players.get(pid, {}).get("position")
+                if pos in ("QB", "RB", "WR", "TE"):
+                    groups.setdefault(pos, []).append(describe(pid, players))
+            s = r["settings"]
+            print(f"- **{users.get(r['owner_id'], '?')}** ({s.get('wins', 0)}-{s.get('losses', 0)}): "
+                  + " | ".join(f"{pos}: {', '.join(groups.get(pos, []))}" for pos in ("QB", "RB", "WR", "TE")))
 
         tx = [t for t in get(f"/league/{lid}/transactions/{week}") if t.get("status") == "complete"]
         if tx:
