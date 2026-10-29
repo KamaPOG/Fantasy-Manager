@@ -39,6 +39,54 @@ def describe(pid, players, points=None):
     return out
 
 
+def dynasty_section(lid, league, rosters, mine, ranked, users, players):
+    from dynasty_values import ktc, norm, pick_inventory, pick_label, pick_tier, pick_value
+    try:
+        values = ktc(superflex="SUPER_FLEX" in league["roster_positions"])
+    except Exception as e:  # KTC down should not break the daily report
+        print(f"\n### Dynasty-Werte nicht verfügbar ({e})")
+        return
+    teams = len(rosters)
+    rank_of = {r["roster_id"]: i for i, r in enumerate(ranked, 1)}
+    inv = pick_inventory(lid)
+    season = int(league["season"])
+
+    def pval(y, rnd, orig):
+        tier = pick_tier(rank_of[orig], teams) if int(y) == season + 1 else "Mid"
+        return tier, pick_value(values, y, rnd, tier)
+
+    def team_value(r):
+        pv = sum(values.get(norm(players.get(p, {}).get("full_name")), {}).get("value", 0) for p in r.get("players") or [])
+        kv = sum(pval(*pk)[1] for pk in inv.get(r["roster_id"], []))
+        return pv, kv
+
+    print("\n### Dynasty-Werte (KeepTradeCut, %s)" % ("Superflex" if "SUPER_FLEX" in league["roster_positions"] else "1QB"))
+    totals = sorted(((sum(team_value(r)), r) for r in rosters), key=lambda x: -x[0])
+    for i, (tot, r) in enumerate(totals, 1):
+        pv, kv = team_value(r)
+        flag = " <- DU" if r is mine else ""
+        print(f"{i}. {users.get(r['owner_id'], '?')}: {tot} (Spieler {pv}, Picks {kv}){flag}")
+    print("\nMein Kader nach Wert (Name – Wert, 7-Tage-Trend, Alter):")
+    mine_vals = []
+    for p in mine.get("players") or []:
+        e = values.get(norm(players.get(p, {}).get("full_name")))
+        mine_vals.append((e["value"] if e else 0, p, e))
+    for v, p, e in sorted(mine_vals, key=lambda x: -x[0]):
+        extra = f"{v}, Trend {e['trend7']:+d}, Alter {e['age']}" if e else "kein KTC-Wert"
+        print(f"- {describe(p, players)} – {extra}")
+    print("\nMeine Draft-Picks (Prognose nach aktueller Tabelle):")
+    for y, rnd, orig in inv.get(mine["roster_id"], []):
+        tier, v = pval(y, rnd, orig)
+        frm = "" if orig == mine["roster_id"] else f" (von {users.get(next(r['owner_id'] for r in rosters if r['roster_id'] == orig), '?')})"
+        print(f"- {pick_label(y, rnd, tier)}{frm} – Wert {v}")
+    gone = [(y, rnd) for (y, rnd, orig) in (pk for rid, pks in inv.items() if rid != mine["roster_id"] for pk in pks)
+            if orig == mine["roster_id"]]
+    if gone:
+        print("Abgegebene eigene Picks: " + ", ".join(pick_label(y, r) for y, r in gone))
+    print("\nPick-Bestand der anderen Teams: " + "; ".join(
+        f"{users.get(r['owner_id'], '?')} {len(inv.get(r['roster_id'], []))}" for r in rosters if r is not mine))
+
+
 def main():
     state = get("/state/nfl")
     season, week = state["season"], state["week"]
@@ -109,6 +157,9 @@ def main():
         print("\n### Beste freie Spieler (nach Sleeper-Rang)")
         for pid, p in free[:25]:
             print(f"- {describe(pid, players)} – Alter {p.get('age')}, Rang {p['search_rank']}")
+
+        if league["settings"].get("type") == 2:
+            dynasty_section(lid, league, rosters, mine, ranked, users, players)
 
         print("\n### Andere Kader (für Trades)")
         for r in ranked:

@@ -18,6 +18,7 @@ import re
 import urllib.request
 
 from sleeper_snapshot import CACHE, USERNAME, get, players_db
+import dynasty_values as dv
 
 IMG_CACHE = os.path.join(CACHE, "img")
 ACTION_LABELS = {"lineup": "Aufstellen", "trade": "Trade", "waiver": "Waiver",
@@ -120,7 +121,27 @@ class Players:
     def image_css(self):
         return "".join(f".{c}{{background-image:url({u})}}" for c, u in self.used.items())
 
-    def card(self, ref, rostered=(), size="", status=None):
+    def value(self, ref, values, rostered=()):
+        """KTC value of a player or pick token, or None."""
+        if not values:
+            return None
+        pick = PICK_RE.match(str(ref or ""))
+        if pick:
+            y, tier, rnd = pick.group(1), (pick.group(2) or "Mid").title(), pick.group(3).lower()
+            e = values.get(f"{y} {tier} {rnd}".lower())
+            return e["value"] if e else None
+        pid = self.resolve(ref, rostered)
+        e = values.get(dv.norm(self.db.get(pid, {}).get("full_name"))) if pid else None
+        return e["value"] if e else None
+
+    def card(self, ref, rostered=(), size="", status=None, value=None):
+        pick = PICK_RE.match(str(ref or ""))
+        if pick:
+            y, tier, rnd, frm = pick.groups()
+            label = f"{y} {rnd}" + (f" · {tier.title()}" if tier else "")
+            sub = (f"von {frm}" if frm else "Draft-Pick") + (f" · Wert {value:,}".replace(",", ".") if value else "")
+            return (f'<div class="pl pick {size}"><div class="av"><span>R{rnd[0]}</span></div>'
+                    f'<div class="pl-t"><b>{esc(label)}</b><small>{esc(sub)}</small></div></div>')
         pid = self.resolve(ref, rostered)
         if not pid:
             return f'<div class="pl {size}"><div class="av"><span>?</span></div><div class="pl-t"><b>{esc(ref)}</b></div></div>'
@@ -137,8 +158,17 @@ class Players:
         status = status or p.get("injury_status")
         pill = f'<i class="inj {inj_class(status)}">{esc(status)}</i>' if status else ""
         meta = f"{p.get('position', '?')} · {team or 'FA'}"
+        if value:
+            meta += f" · Wert {value:,}".replace(",", ".")
         return (f'<div class="pl {size}"><div class="av">{img}{badge}</div>'
                 f'<div class="pl-t"><b>{esc(name)}</b><small>{esc(meta)} {pill}</small></div></div>')
+
+
+PICK_RE = re.compile(r"^(20\d\d)\s+(?:(early|mid|late)\s+)?(1st|2nd|3rd|4th)(?:\s*\((?:von\s+)?(.+)\))?$", re.I)
+
+
+def fmt(n):
+    return f"{n:,.0f}".replace(",", ".")
 
 
 def inj_class(status):
@@ -169,7 +199,42 @@ def league_context(user_id, league_id, week):
         "rostered": {p for r in rosters for p in (r.get("players") or [])},
         "opponent": None,
         "starters": mine.get("starters") or [],
+        "lid": league_id,
+        "dynasty": league["settings"].get("type") == 2,
+        "values": None,
     }
+    if ctx["dynasty"]:
+        try:
+            values = dv.ktc(superflex=ctx["superflex"])
+            ctx["values"] = values
+            inv = dv.pick_inventory(league_id)
+            rank_of = {r["roster_id"]: i for i, r in enumerate(ranked, 1)}
+            season = int(league["season"])
+
+            def pval(y, rnd, orig):
+                tier = dv.pick_tier(rank_of[orig], len(rosters)) if int(y) == season + 1 else "Mid"
+                return tier, dv.pick_value(values, y, rnd, tier)
+
+            pdb = players_db()
+            teams = []
+            for r in rosters:
+                pv = sum(values.get(dv.norm(pdb.get(p, {}).get("full_name")), {}).get("value", 0) for p in r.get("players") or [])
+                kv = sum(pval(*pk)[1] for pk in inv.get(r["roster_id"], []))
+                teams.append({"name": users.get(r["owner_id"], "?"), "players": pv, "picks": kv, "me": r is mine})
+            teams.sort(key=lambda t: -(t["players"] + t["picks"]))
+            ctx["team_values"] = teams
+            owner_name = {r["roster_id"]: users.get(r["owner_id"], "?") for r in rosters}
+            ctx["picks"] = [{"season": y, "round": rnd, "tier": pval(y, rnd, orig)[0], "value": pval(y, rnd, orig)[1],
+                             "from": None if orig == mine["roster_id"] else owner_name[orig]}
+                            for y, rnd, orig in inv.get(mine["roster_id"], [])]
+            ages = []
+            for p in mine.get("players") or []:
+                e = values.get(dv.norm(pdb.get(p, {}).get("full_name")))
+                if e and e.get("age"):
+                    ages.append((e["age"], e["value"], p))
+            ctx["ages"] = ages
+        except Exception:
+            ctx["values"] = None
     matchups = get(f"/league/{league_id}/matchups/{week}")
     me = next((m for m in matchups if m["roster_id"] == mine["roster_id"]), None)
     if me and me.get("matchup_id"):
@@ -206,6 +271,108 @@ def lineup_changes(P, la, ctx):
             swaps.append({"out": o, "in": None, "slot": None, "note": None})
     conditional = [(pid, r) for pid, r in rows if pid and r.get("alt") and r.get("verdict") == "check"]
     return swaps, conditional
+
+
+def render_overview(P, leagues, short):
+    out = ['<section class="section"><h3>Überblick</h3><div class="ov">']
+    for lid, la, ctx in leagues:
+        swaps, _ = lineup_changes(P, la, ctx)
+        mine_inj = [i for i in la.get("injuries") or [] if i.get("impact") == "mine"]
+        stats = [("Wechsel", len(swaps), "bad" if swaps else "good"),
+                 ("Waiver", len(la.get("free_agents") or []), "warn" if la.get("free_agents") else "good"),
+                 ("Trades", len(la.get("trades") or []), "acc"),
+                 ("Verletzt", len(mine_inj), "warn" if mine_inj else "good")]
+        if ctx.get("team_values"):
+            pos = next(i for i, t in enumerate(ctx["team_values"], 1) if t["me"])
+            stats.append(("Kaderwert", f"{pos}.", "acc"))
+        outlook = la.get("outlook") or (la.get("future") or {}).get("outlook")
+        out.append(f'<a class="ov-t" href="#{esc(la.get("anchor") or "l" + lid)}"><div class="ov-h"><b>{esc(short[lid])}</b>'
+                   f'<small>{ctx["rank"]}. Platz · {ctx["record"]}</small></div>'
+                   + (f'<span class="chip week">{esc(outlook)}</span>' if outlook else "")
+                   + '<div class="ov-s">' + "".join(
+                       f'<div class="st {c}"><b>{v}</b><small>{l}</small></div>' for l, v, c in stats) + "</div></a>")
+    out.append("</div></section>")
+    return "".join(out)
+
+
+def render_news(P, news, short, rostered):
+    if not news:
+        return ""
+    out = ['<section class="section"><h3>News des Tages</h3><div class="news">']
+    for n in news:
+        imp = n.get("impact", "neutral")
+        lab = {"good": "Gut für dich", "bad": "Schlecht für dich", "neutral": "Info"}.get(imp, imp)
+        pls = "".join(P.card(r, rostered, "sm") for r in n.get("players") or [])
+        src = (f'<a href="{html.escape(n["url"], quote=True)}" target="_blank" rel="noopener">{esc(n.get("source") or "Quelle")}</a>'
+               if n.get("url") else esc(n.get("source")))
+        lg = short.get(n.get("league"), "")
+        out.append(f'<article class="nw {imp}"><div class="nw-h"><span class="chip {imp}">{lab}</span>'
+                   + (f'<span class="chip">{esc(lg)}</span>' if lg else "") + f"<small>{src}</small></div>"
+                   f"<b>{esc(n.get('title'))}</b><p>{esc(n.get('text'))}</p>"
+                   + (f'<div class="pls">{pls}</div>' if pls else "") + "</article>")
+    out.append("</div></section>")
+    return "".join(out)
+
+
+def render_future(P, la, ctx):
+    fut = la.get("future") or {}
+    if not (ctx.get("dynasty") and (fut or ctx.get("picks"))):
+        return ""
+    R, V = ctx["rostered"], ctx.get("values")
+    out = ['<div class="section"><h3>Zukunft &amp; Dynasty-Plan</h3>']
+    if fut.get("text"):
+        out.append(f'<p class="summary">{esc(fut["text"])}</p>')
+    out.append('<div class="grid2">')
+    if ctx.get("team_values"):
+        top = max(t["players"] + t["picks"] for t in ctx["team_values"]) or 1
+        out.append('<div class="panel"><h3>Kaderwert der Liga</h3><small>KeepTradeCut, Spieler + Picks</small><div class="bars">')
+        for i, t in enumerate(ctx["team_values"], 1):
+            w1, w2 = 100 * t["players"] / top, 100 * t["picks"] / top
+            out.append(f'<div class="bar{" me" if t["me"] else ""}"><span>{i}. {esc(t["name"])}</span>'
+                       f'<div class="track"><i class="pv" style="width:{w1:.1f}%"></i><i class="kv" style="width:{w2:.1f}%"></i></div>'
+                       f'<b>{fmt(t["players"] + t["picks"])}</b></div>')
+        out.append('</div><small class="legend"><i class="pv"></i> Spieler <i class="kv"></i> Picks</small></div>')
+    if ctx.get("picks"):
+        out.append('<div class="panel"><h3>Deine Draft-Picks</h3><small>Prognose nach aktueller Tabelle</small><div class="picks">')
+        for pk in ctx["picks"]:
+            rn = dv.ROUND_NAMES[pk["round"]]
+            out.append(f'<div class="pk r{pk["round"]}"><b>{pk["season"]} {rn}</b><small>{pk["tier"]}'
+                       + (f' · von {esc(pk["from"])}' if pk["from"] else "") + f'</small><span>{fmt(pk["value"])}</span></div>')
+        out.append("</div></div>")
+    out.append("</div>")
+    if ctx.get("ages"):
+        buckets = [("bis 24", lambda a: a < 25), ("25–27", lambda a: 25 <= a < 28), ("28–30", lambda a: 28 <= a < 31), ("31+", lambda a: a >= 31)]
+        tot = sum(v for _, v, _ in ctx["ages"]) or 1
+        out.append('<div class="panel"><h3>Altersprofil deines Kaders</h3><small>Anteil am Kaderwert</small><div class="ages">')
+        for name, f in buckets:
+            share = sum(v for a, v, _ in ctx["ages"] if f(a)) / tot
+            out.append(f'<div class="ag"><span>{name}</span><div class="track"><i class="pv" style="width:{100 * share:.0f}%"></i></div><b>{100 * share:.0f}%</b></div>')
+        out.append("</div></div>")
+    for key, title, cls in (("sell", "Verkaufen, solange der Wert da ist", "give"), ("buy", "Kaufen für die Zukunft", "get"), ("hold", "Halten", "")):
+        if fut.get(key):
+            out.append(f'<div class="panel"><h3>{title}</h3><div class="cards3 inner">')
+            for it in fut[key]:
+                out.append(f'<div class="item">{P.card(it.get("player"), R, value=P.value(it.get("player"), V, R))}<p>{esc(it.get("text"))}</p></div>')
+            out.append("</div></div>")
+    out.append("</div>")
+    return "".join(out)
+
+
+def render_experts(P, la, ctx):
+    if not la.get("experts"):
+        return ""
+    R = ctx["rostered"]
+    out = ['<div class="section"><h3>Was die Profis sagen</h3><div class="cards3">']
+    for e in la["experts"]:
+        v = (e.get("verdict") or "").lower()
+        cls = "start" if v in ("start", "buy", "kaufen", "holen") else "check" if v in ("sit", "sell", "verkaufen", "bank") else "swap"
+        src = (f'<a href="{html.escape(e["url"], quote=True)}" target="_blank" rel="noopener">{esc(e.get("source"))}</a>'
+               if e.get("url") else esc(e.get("source")))
+        out.append(f'<div class="panel"><div class="trade-head">{P.card(e.get("player"), R)}'
+                   f'<span class="verdict {cls}">{esc(e.get("verdict"))}</span></div>'
+                   f"<p>{esc(e.get('text'))}</p><small>{src}</small></div>")
+    out.append("</div></div>")
+    return "".join(out)
 
 
 def render_changes(P, leagues, short):
@@ -346,6 +513,46 @@ small { color: var(--muted); }
 .cond { display: grid; gap: 6px; }
 .empty { font-style: italic; color: var(--muted); }
 .items { display: grid; gap: 12px; }
+.ov { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 14px; }
+.ov-t { display: grid; gap: 10px; padding: 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); color: var(--fg); text-decoration: none; }
+.ov-t:hover { border-color: var(--accent); }
+.ov-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ov-h b { font-family: var(--f-display); font-size: 1.4rem; }
+.ov-t > .chip { justify-self: start; }
+.ov-s { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); gap: 6px; }
+.st { display: grid; padding: 8px; border-radius: 6px; background: var(--sunk); font-variant-numeric: tabular-nums; }
+.st b { font-family: var(--f-display); font-size: 1.5rem; line-height: 1; }
+.st small { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
+.st.bad b { color: var(--bad); } .st.warn b { color: var(--warn); } .st.good b { color: var(--good); } .st.acc b { color: var(--accent); }
+.news { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.nw { display: grid; gap: 6px; align-content: start; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.nw p { margin: 0; }
+.nw-h { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.nw .pls { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip.good { background: var(--good-soft); color: var(--good); } .chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.neutral { background: var(--sunk); color: var(--muted); }
+.bal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.bal b { font-family: var(--f-display); font-size: 1.2rem; }
+.bars, .ages { display: grid; gap: 6px; }
+.bar, .ag { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 4.5rem; gap: 8px; align-items: center; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.ag { grid-template-columns: 4rem minmax(0, 1fr) 3rem; }
+.bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar b, .ag b { text-align: right; }
+.bar.me { font-weight: 700; } .bar.me span { color: var(--accent); }
+.track { display: flex; height: 10px; border-radius: 5px; background: var(--sunk); overflow: hidden; }
+.track i, .legend i { display: inline-block; height: 100%; }
+i.pv { background: var(--accent); } i.kv { background: var(--warn); }
+.legend { display: flex; gap: 6px; align-items: center; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; }
+.picks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 480px) { .picks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pk { display: grid; padding: 8px; border-radius: 6px; background: var(--sunk); font-variant-numeric: tabular-nums; }
+.pk b { font-size: .9rem; } .pk span { font-family: var(--f-display); font-size: 1.2rem; }
+.pk.r1 { box-shadow: inset 3px 0 0 var(--accent); } .pk.r2 { box-shadow: inset 3px 0 0 var(--warn); }
+.pl.pick .av > span { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); }
+.pl.pick.sm .av > span { width: 30px; height: 30px; font-size: .8rem; }
+.cards3.inner { gap: 16px; }
+.cards3.inner .item { border-top: 0; padding-top: 0; }
 .item { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .item:first-child { border-top: 0; padding-top: 0; }
 .item p { margin: 0; }
@@ -396,6 +603,7 @@ def render(analysis):
         + '<a href="#aendern">Raus / Rein</a></nav>')
     out.append("</header>")
 
+    out.append(render_overview(P, leagues, short))
     out.append(render_changes(P, leagues, short))
 
     acts = analysis.get("actions") or []
@@ -413,6 +621,8 @@ def render(analysis):
                 f'<p>{"<b>" + esc(lg) + ":</b> " if lg else ""}{esc(a.get("text"))}</p>'
                 + (f'<div class="pls">{pls}</div>' if pls else "") + "</li>")
         out.append("</ol></section>")
+
+    out.append(render_news(P, analysis.get("news"), short, all_rostered))
 
     for lid, la, ctx in leagues:
         R = ctx["rostered"]
@@ -470,6 +680,8 @@ def render(analysis):
                            f'<p>{esc(o.get("text"))}</p></div>')
             out.append("</div></div>")
 
+        out.append(render_experts(P, la, ctx))
+
         if la.get("free_agents"):
             out.append('<div class="section"><h3>Free Agents</h3><div class="cards3">')
             for fa in la["free_agents"]:
@@ -482,18 +694,30 @@ def render(analysis):
 
         if la.get("trades"):
             out.append('<div class="section"><h3>Trade-Tipps</h3><div class="cards3">')
+            V = ctx.get("values")
             for t in la["trades"]:
-                give = "".join(P.card(x, R, "sm") for x in t.get("give") or [])
-                getp = "".join(P.card(x, R, "sm") for x in t.get("get") or [])
+                gv = [P.value(x, V, R) for x in t.get("give") or []]
+                tv = [P.value(x, V, R) for x in t.get("get") or []]
+                give = "".join(P.card(x, R, "sm", value=v) for x, v in zip(t.get("give") or [], gv))
+                getp = "".join(P.card(x, R, "sm", value=v) for x, v in zip(t.get("get") or [], tv))
                 kind = TRADE_KINDS.get(t.get("kind"), t.get("kind") or "")
+                balance = ""
+                if V and any(gv) and any(tv):
+                    g, b = sum(v or 0 for v in gv), sum(v or 0 for v in tv)
+                    diff = (b - g) / max(g, b)
+                    word, cls = (("fair", "ok") if abs(diff) <= .12 else ("du gewinnst Wert", "ok") if diff > 0
+                                 else ("du zahlst drauf", "warn"))
+                    balance = (f'<div class="bal"><small>KTC-Wert</small><b>{fmt(g)}</b><span>⇄</span><b>{fmt(b)}</b>'
+                               f'<i class="inj {cls}">{word}</i></div>')
                 out.append('<div class="panel"><div class="trade-head">'
                            f'<b>mit {esc(t.get("partner"))}</b><span class="chip week">{esc(kind)}</span></div>'
                            '<div class="swapline">'
                            f'<div class="side"><span class="lbl give">Du gibst</span>{give}</div>'
                            '<span class="arrow">⇄</span>'
                            f'<div class="side"><span class="lbl get">Du bekommst</span>{getp}</div></div>'
-                           f'<p>{esc(t.get("text"))}</p></div>')
+                           f'{balance}<p>{esc(t.get("text"))}</p></div>')
             out.append("</div></div>")
+        out.append(render_future(P, la, ctx))
         out.append("</section>")
 
     if analysis.get("sources"):
